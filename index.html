@@ -20,11 +20,8 @@
         .btn-section { background: white; color: var(--primary); border: 1px solid var(--primary); font-size: 14px; flex: 1 1 40%; }
         .btn-wrong-mode { background: #555; color: white; width: 90%; max-width: 300px; }
         
-        /* クイズ操作ボタンのコンテナ */
         .action-container { display: flex; justify-content: space-between; width: 100%; gap: 10px; }
         .action-btn { flex: 1; padding: 18px; font-size: 18px; color: white; }
-        
-        /* 左：正解、右：間違い の順に修正 */
         #correctBtn { background: var(--success); display: none; }
         #wrongBtn { background: var(--danger); display: none; }
         #showBtn { background: var(--primary); color: white; width: 100%; }
@@ -33,8 +30,10 @@
         .progress-container { width: 100%; background: #ddd; border-radius: 10px; height: 8px; margin: 10px 0; overflow: hidden; }
         #progressBar { width: 0%; height: 100%; background: var(--primary); transition: width 0.3s; }
 
-        #setup, #quiz, #result { display: none; }
+        /* 画面切り替え用 */
+        #setup, #countSelect, #quiz, #result { display: none; }
         .active { display: block !important; }
+
         .stats { font-size: 14px; color: #888; margin: 10px 0; }
         h3 { border-left: 5px solid var(--primary); text-align: left; padding-left: 10px; margin-top: 30px; font-size: 18px; }
     </style>
@@ -49,7 +48,7 @@
         <div class="stats" id="totalStatsText"></div>
         <button class="btn-wrong-mode" onclick="startQuiz('wrong')">苦手克服モード (ミスのみ)</button>
 
-        <h3>ランダムに出題</h3>
+        <h3>ランダムに出題 (全範囲)</h3>
         <div class="section-grid">
             <button class="btn-main" onclick="startQuiz(10)">10問</button>
             <button class="btn-main" onclick="startQuiz(20)">20問</button>
@@ -62,22 +61,34 @@
         <div id="sectionButtons" class="section-grid"></div>
     </div>
 
+    <div id="countSelect">
+        <h2 id="selectedSectionText">範囲: 1 〜 100</h2>
+        <p>何問出題しますか？</p>
+        <div class="section-grid">
+            <button class="btn-main" style="width:100px" onclick="setCountAndStart(10)">10問</button>
+            <button class="btn-main" style="width:100px" onclick="setCountAndStart(20)">20問</button>
+            <button class="btn-main" style="width:100px" onclick="setCountAndStart(40)">40問</button>
+            <button class="btn-main" style="width:100px" onclick="setCountAndStart(50)">50問</button>
+            <button class="btn-main" style="width:100px" onclick="setCountAndStart(75)">75問</button>
+            <button class="btn-main" style="width:100px" onclick="setCountAndStart(100)">100問</button>
+        </div>
+        <div style="margin-top:30px;">
+            <a href="#" onclick="location.reload()" style="color:#999; text-decoration:none;">← 戻る</a>
+        </div>
+    </div>
+
     <div id="quiz">
         <div class="stats">問題: <span id="progressNum">0</span> / <span id="totalNum">0</span></div>
         <div class="progress-container"><div id="progressBar"></div></div>
-        
         <div class="card">
             <div id="wordDisplay" class="word"></div>
             <div id="meaningDisplay" class="meaning"></div>
         </div>
-
         <button id="showBtn" onclick="showAnswer()">答えを表示</button>
-        
         <div class="action-container">
             <button id="correctBtn" class="action-btn" onclick="handleResult(true)">正解！</button>
             <button id="wrongBtn" class="action-btn" onclick="handleResult(false)">間違い</button>
         </div>
-        
         <div style="margin-top:30px;">
             <a href="#" onclick="if(confirm('中断しますか？')) location.reload()" style="color:#999; text-decoration:none; font-size: 14px;">← 中断して戻る</a>
         </div>
@@ -96,6 +107,7 @@
 
 <script>
 let wordData = [];
+let tempSectionWords = []; // セクション選択時に一時保存する用
 let quizWords = [];
 let currentIndex = 0;
 let correctCount = 0;
@@ -129,9 +141,29 @@ function createSectionButtons() {
         const btn = document.createElement('button');
         btn.className = 'btn-section';
         btn.innerText = `${start} 〜 ${end}`;
-        btn.onclick = () => startQuiz('section', start, end);
+        btn.onclick = () => openCountSelect(start, end);
         container.appendChild(btn);
     }
+}
+
+// 範囲を選んだ後の「問題数選択」画面を開く
+function openCountSelect(start, end) {
+    document.getElementById('setup').classList.remove('active');
+    document.getElementById('countSelect').classList.add('active');
+    document.getElementById('selectedSectionText').innerText = `範囲: ${start} 〜 ${end}`;
+    
+    // その範囲の単語を一時保存
+    tempSectionWords = wordData.filter(w => {
+        const idNum = parseInt(w.id);
+        return idNum >= start && idNum <= end;
+    });
+}
+
+// 問題数を決めてクイズ開始
+function setCountAndStart(count) {
+    quizWords = [...tempSectionWords].sort(() => 0.5 - Math.random()).slice(0, count);
+    document.getElementById('countSelect').classList.remove('active');
+    startQuizCore();
 }
 
 function updateStats() {
@@ -139,18 +171,13 @@ function updateStats() {
     document.getElementById('totalStatsText').innerText = `全${wordData.length}語中、現在の苦手単語: ${mistakes.length}語`;
 }
 
-function startQuiz(mode, start, end) {
+// メイン画面の「ランダム出題」や「苦手克服」用
+function startQuiz(mode) {
     let mistakes = JSON.parse(localStorage.getItem(MISTAKE_KEY) || "[]");
-    correctCount = 0;
-
+    
     if (mode === 'wrong') {
         quizWords = wordData.filter(w => mistakes.includes(w.id));
         if (quizWords.length === 0) return alert("苦手な単語はありません！");
-    } else if (mode === 'section') {
-        quizWords = wordData.filter(w => {
-            const idNum = parseInt(w.id);
-            return idNum >= start && idNum <= end;
-        });
     } else {
         quizWords = [...wordData];
     }
@@ -160,8 +187,14 @@ function startQuiz(mode, start, end) {
         quizWords = quizWords.slice(0, mode);
     }
 
-    currentIndex = 0;
     document.getElementById('setup').classList.remove('active');
+    startQuizCore();
+}
+
+// クイズ開始の共通処理
+function startQuizCore() {
+    correctCount = 0;
+    currentIndex = 0;
     document.getElementById('quiz').classList.add('active');
     showQuestion();
 }
