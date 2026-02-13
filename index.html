@@ -6,34 +6,29 @@
     <title>英単語1800 マスター</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        :root { --primary: #1a73e8; --success: #2e7d32; --danger: #d32f2f; --gray: #5f6368; --bg: #f8f9fa; }
+        :root { --primary: #1a73e8; --success: #2e7d32; --danger: #d32f2f; --gray: #5f6368; --bg: #f8f9fa; --gold: #f9a825; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; text-align: center; background: var(--bg); margin: 0; padding: 20px; color: #333; }
         .container { max-width: 600px; margin: 0 auto; }
-        
         .card { background: white; border-radius: 20px; padding: 40px 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin: 20px auto; min-height: 220px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .word { font-size: 40px; font-weight: bold; color: var(--primary); margin-bottom: 20px; }
         .meaning { font-size: 28px; color: var(--gray); display: none; border-top: 1px solid #eee; padding-top: 15px; width: 100%; }
-        
         button { padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 12px; margin: 5px; font-weight: bold; transition: 0.2s; }
         button:active { transform: scale(0.95); }
         .btn-main { background: var(--primary); color: white; width: 70px; }
-        .btn-section { background: white; color: var(--primary); border: 1px solid var(--primary); font-size: 14px; flex: 1 1 40%; }
+        .btn-section { background: white; color: var(--primary); border: 1px solid var(--primary); font-size: 13px; flex: 1 1 40%; position: relative; }
+        .btn-mastered { border: 2px solid var(--gold); color: var(--gold); }
+        .mastered-badge { display: block; font-size: 10px; color: var(--gold); font-weight: bold; }
         .btn-wrong-mode { background: #555; color: white; width: 90%; max-width: 300px; }
-        
         .action-container { display: flex; justify-content: space-between; width: 100%; gap: 10px; }
         .action-btn { flex: 1; padding: 18px; font-size: 18px; color: white; }
         #correctBtn { background: var(--success); display: none; }
         #wrongBtn { background: var(--danger); display: none; }
         #showBtn { background: var(--primary); color: white; width: 100%; }
-
         .section-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; justify-content: center; }
         .progress-container { width: 100%; background: #ddd; border-radius: 10px; height: 8px; margin: 10px 0; overflow: hidden; }
         #progressBar { width: 0%; height: 100%; background: var(--primary); transition: width 0.3s; }
-
-        /* 画面切り替え用 */
         #setup, #countSelect, #quiz, #result { display: none; }
         .active { display: block !important; }
-
         .stats { font-size: 14px; color: #888; margin: 10px 0; }
         h3 { border-left: 5px solid var(--primary); text-align: left; padding-left: 10px; margin-top: 30px; font-size: 18px; }
     </style>
@@ -48,33 +43,23 @@
         <div class="stats" id="totalStatsText"></div>
         <button class="btn-wrong-mode" onclick="startQuiz('wrong')">苦手克服モード (ミスのみ)</button>
 
-        <h3>ランダムに出題 (全範囲)</h3>
+        <h3>100問ごとのセクション</h3>
+        <div id="sectionButtons" class="section-grid"></div>
+
+        <h3>全範囲からランダム</h3>
         <div class="section-grid">
             <button class="btn-main" onclick="startQuiz(10)">10問</button>
             <button class="btn-main" onclick="startQuiz(20)">20問</button>
-            <button class="btn-main" onclick="startQuiz(40)">40問</button>
-            <button class="btn-main" onclick="startQuiz(75)">75問</button>
+            <button class="btn-main" onclick="startQuiz(50)">50問</button>
             <button class="btn-main" onclick="startQuiz(100)">100問</button>
         </div>
-
-        <h3>100問ごとのセクション</h3>
-        <div id="sectionButtons" class="section-grid"></div>
     </div>
 
     <div id="countSelect">
-        <h2 id="selectedSectionText">範囲: 1 〜 100</h2>
-        <p>何問出題しますか？</p>
-        <div class="section-grid">
-            <button class="btn-main" style="width:100px" onclick="setCountAndStart(10)">10問</button>
-            <button class="btn-main" style="width:100px" onclick="setCountAndStart(20)">20問</button>
-            <button class="btn-main" style="width:100px" onclick="setCountAndStart(40)">40問</button>
-            <button class="btn-main" style="width:100px" onclick="setCountAndStart(50)">50問</button>
-            <button class="btn-main" style="width:100px" onclick="setCountAndStart(75)">75問</button>
-            <button class="btn-main" style="width:100px" onclick="setCountAndStart(100)">100問</button>
-        </div>
-        <div style="margin-top:30px;">
-            <a href="#" onclick="location.reload()" style="color:#999; text-decoration:none;">← 戻る</a>
-        </div>
+        <h2 id="selectedSectionText"></h2>
+        <p>未習得を優先してランダムに出題します</p>
+        <div class="section-grid" id="countOptions"></div>
+        <div style="margin-top:30px;"><a href="#" onclick="location.reload()" style="color:#999; text-decoration:none;">← 戻る</a></div>
     </div>
 
     <div id="quiz">
@@ -89,17 +74,13 @@
             <button id="correctBtn" class="action-btn" onclick="handleResult(true)">正解！</button>
             <button id="wrongBtn" class="action-btn" onclick="handleResult(false)">間違い</button>
         </div>
-        <div style="margin-top:30px;">
-            <a href="#" onclick="if(confirm('中断しますか？')) location.reload()" style="color:#999; text-decoration:none; font-size: 14px;">← 中断して戻る</a>
-        </div>
     </div>
 
     <div id="result">
         <h1>学習完了！</h1>
         <div class="card">
-            <div style="font-size: 20px;">今回の正解率</div>
-            <div id="accuracy" style="font-size: 48px; font-weight: bold; color: var(--success); margin: 10px 0;">0%</div>
-            <div id="resultText" style="color: var(--gray);"></div>
+            <div id="accuracy" style="font-size: 48px; font-weight: bold; color: var(--success);">0%</div>
+            <div id="resultText"></div>
         </div>
         <button class="btn-wrong-mode" style="width:100%" onclick="location.reload()">タイトルに戻る</button>
     </div>
@@ -107,11 +88,11 @@
 
 <script>
 let wordData = [];
-let tempSectionWords = []; // セクション選択時に一時保存する用
+let tempSectionWords = [];
 let quizWords = [];
 let currentIndex = 0;
 let correctCount = 0;
-const MISTAKE_KEY = 'v1_mistakes';
+const STORAGE_KEY = 'v1_word_mastery';
 const CSV_FILE = '英単語1800 - シート1.csv';
 
 window.onload = () => {
@@ -121,80 +102,91 @@ window.onload = () => {
             wordData = results.data
                 .map(row => ({ id: String(row[0]).trim(), w: row[1], m: row[2] }))
                 .filter(item => item.w && item.id && !isNaN(item.id));
-
             document.getElementById('loading').style.display = 'none';
             document.getElementById('setup').classList.add('active');
             createSectionButtons();
             updateStats();
-        },
-        error: function() {
-            document.getElementById('loading').innerHTML = "<p style='color:red;'>CSV読み込みエラー</p>";
         }
     });
 };
 
+function getMasteryData() {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+}
+
+function updateStats() {
+    const mastery = getMasteryData();
+    const masteredCount = Object.values(mastery).filter(count => count >= 2).length;
+    document.getElementById('totalStatsText').innerText = `全${wordData.length}語中、習得済み: ${masteredCount}語`;
+}
+
 function createSectionButtons() {
     const container = document.getElementById('sectionButtons');
+    const mastery = getMasteryData();
     for (let i = 0; i < wordData.length; i += 100) {
         const start = i + 1;
         const end = Math.min(i + 100, wordData.length);
+        const sectionWords = wordData.slice(i, end);
+        const isMastered = sectionWords.every(w => (mastery[w.id] || 0) >= 2);
         const btn = document.createElement('button');
-        btn.className = 'btn-section';
-        btn.innerText = `${start} 〜 ${end}`;
+        btn.className = `btn-section ${isMastered ? 'btn-mastered' : ''}`;
+        btn.innerHTML = `${isMastered ? '<span class="mastered-badge">★習得済み★</span>' : ''}${start} 〜 ${end}`;
         btn.onclick = () => openCountSelect(start, end);
         container.appendChild(btn);
     }
 }
 
-// 範囲を選んだ後の「問題数選択」画面を開く
 function openCountSelect(start, end) {
     document.getElementById('setup').classList.remove('active');
     document.getElementById('countSelect').classList.add('active');
     document.getElementById('selectedSectionText').innerText = `範囲: ${start} 〜 ${end}`;
-    
-    // その範囲の単語を一時保存
     tempSectionWords = wordData.filter(w => {
         const idNum = parseInt(w.id);
         return idNum >= start && idNum <= end;
     });
+    const opts = [10, 20, 40, 50, 75, 100];
+    const container = document.getElementById('countOptions');
+    container.innerHTML = '';
+    opts.forEach(num => {
+        const b = document.createElement('button');
+        b.className = 'btn-main';
+        b.style.width = '100px';
+        b.innerText = `${num}問`;
+        b.onclick = () => setCountAndStart(num);
+        container.appendChild(b);
+    });
 }
 
-// 問題数を決めてクイズ開始
 function setCountAndStart(count) {
-    quizWords = [...tempSectionWords].sort(() => 0.5 - Math.random()).slice(0, count);
+    const mastery = getMasteryData();
+    const unmastered = tempSectionWords.filter(w => (mastery[w.id] || 0) < 2).sort(() => 0.5 - Math.random());
+    const mastered = tempSectionWords.filter(w => (mastery[w.id] || 0) >= 2).sort(() => 0.5 - Math.random());
+
+    // 未習得を優先して抽出し、残りを習得済みで補完
+    let selected = [...unmastered, ...mastered].slice(0, count);
+
+    // 【追加】抽出したリストを最後にもう一度混ぜる
+    quizWords = selected.sort(() => 0.5 - Math.random());
+    
     document.getElementById('countSelect').classList.remove('active');
     startQuizCore();
 }
 
-function updateStats() {
-    const mistakes = JSON.parse(localStorage.getItem(MISTAKE_KEY) || "[]");
-    document.getElementById('totalStatsText').innerText = `全${wordData.length}語中、現在の苦手単語: ${mistakes.length}語`;
-}
-
-// メイン画面の「ランダム出題」や「苦手克服」用
 function startQuiz(mode) {
-    let mistakes = JSON.parse(localStorage.getItem(MISTAKE_KEY) || "[]");
-    
+    const mastery = getMasteryData();
     if (mode === 'wrong') {
-        quizWords = wordData.filter(w => mistakes.includes(w.id));
-        if (quizWords.length === 0) return alert("苦手な単語はありません！");
+        quizWords = wordData.filter(w => (mastery[w.id] || 0) === 0);
+        if (quizWords.length === 0) return alert("ミス記録のある単語はありません！");
     } else {
         quizWords = [...wordData];
     }
-
-    quizWords = quizWords.sort(() => 0.5 - Math.random());
-    if (typeof mode === 'number') {
-        quizWords = quizWords.slice(0, mode);
-    }
-
+    quizWords = quizWords.sort(() => 0.5 - Math.random()).slice(0, typeof mode === 'number' ? mode : quizWords.length);
     document.getElementById('setup').classList.remove('active');
     startQuizCore();
 }
 
-// クイズ開始の共通処理
 function startQuizCore() {
-    correctCount = 0;
-    currentIndex = 0;
+    correctCount = 0; currentIndex = 0;
     document.getElementById('quiz').classList.add('active');
     showQuestion();
 }
@@ -202,54 +194,12 @@ function startQuizCore() {
 function showQuestion() {
     const current = quizWords[currentIndex];
     const total = quizWords.length;
-    
     document.getElementById('wordDisplay').innerText = current.w;
     document.getElementById('meaningDisplay').innerText = current.m;
     document.getElementById('meaningDisplay').style.display = 'none';
     document.getElementById('showBtn').style.display = 'block';
     document.getElementById('correctBtn').style.display = 'none';
     document.getElementById('wrongBtn').style.display = 'none';
-    
     document.getElementById('progressNum').innerText = currentIndex + 1;
     document.getElementById('totalNum').innerText = total;
-    document.getElementById('progressBar').style.width = ((currentIndex) / total * 100) + "%";
-}
-
-function showAnswer() {
-    document.getElementById('meaningDisplay').style.display = 'block';
-    document.getElementById('showBtn').style.display = 'none';
-    document.getElementById('correctBtn').style.display = 'block';
-    document.getElementById('wrongBtn').style.display = 'block';
-}
-
-function handleResult(isCorrect) {
-    const current = quizWords[currentIndex];
-    let mistakes = JSON.parse(localStorage.getItem(MISTAKE_KEY) || "[]");
-
-    if (isCorrect) {
-        correctCount++;
-        mistakes = mistakes.filter(id => id !== current.id);
-    } else {
-        if (!mistakes.includes(current.id)) mistakes.push(current.id);
-    }
-    localStorage.setItem(MISTAKE_KEY, JSON.stringify(mistakes));
-
-    currentIndex++;
-    if (currentIndex < quizWords.length) {
-        showQuestion();
-    } else {
-        showFinalResult();
-    }
-}
-
-function showFinalResult() {
-    document.getElementById('quiz').classList.remove('active');
-    document.getElementById('result').classList.add('active');
-    
-    const percent = Math.round((correctCount / quizWords.length) * 100);
-    document.getElementById('accuracy').innerText = percent + "%";
-    document.getElementById('resultText').innerText = `${quizWords.length}問中 ${correctCount}問正解しました！`;
-}
-</script>
-</body>
-</html>
+    document.getElementById('progressBar').style.width = (currentIndex
