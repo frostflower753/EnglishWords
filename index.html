@@ -9,35 +9,29 @@
         :root { --primary: #1a73e8; --success: #2e7d32; --danger: #d32f2f; --gray: #5f6368; --bg: #f8f9fa; --gold: #f9a825; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; text-align: center; background: var(--bg); margin: 0; padding: 20px; color: #333; }
         .container { max-width: 600px; margin: 0 auto; }
-        
         .card { background: white; border-radius: 20px; padding: 40px 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin: 20px auto; min-height: 220px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .word { font-size: 40px; font-weight: bold; color: var(--primary); margin-bottom: 20px; }
         .meaning { font-size: 28px; color: var(--gray); display: none; border-top: 1px solid #eee; padding-top: 15px; width: 100%; }
-        
         button { padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 12px; margin: 5px; font-weight: bold; transition: 0.2s; }
         button:active { transform: scale(0.95); }
         .btn-main { background: var(--primary); color: white; width: 70px; }
         .btn-section { background: white; color: var(--primary); border: 1px solid var(--primary); font-size: 13px; flex: 1 1 40%; position: relative; }
         .btn-mastered { border: 2px solid var(--gold); color: var(--gold); }
         .mastered-badge { display: block; font-size: 10px; color: var(--gold); font-weight: bold; }
-        
         .btn-utility { background: #eee; color: #333; font-size: 14px; width: 45%; }
         .btn-danger-zone { background: #fee; color: var(--danger); border: 1px solid var(--danger); font-size: 12px; margin-top: 50px; width: 200px; }
-
         .action-container { display: flex; justify-content: space-between; width: 100%; gap: 10px; }
         .action-btn { flex: 1; padding: 18px; font-size: 18px; color: white; }
         #correctBtn { background: var(--success); display: none; }
         #wrongBtn { background: var(--danger); display: none; }
         #showBtn { background: var(--primary); color: white; width: 100%; }
-
         .section-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; justify-content: center; }
-        
-        /* 単語一覧のスタイル */
+        .progress-container { width: 100%; background: #ddd; border-radius: 10px; height: 8px; margin: 10px 0; overflow: hidden; }
+        #progressBar { width: 0%; height: 100%; background: var(--primary); transition: width 0.3s; }
         .word-list-table { width: 100%; border-collapse: collapse; background: white; margin-top: 10px; font-size: 14px; text-align: left; }
         .word-list-table th, .word-list-table td { padding: 12px; border-bottom: 1px solid #eee; }
         .mastery-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #ddd; margin-right: 4px; }
         .dot-filled { background: var(--gold); }
-
         #setup, #countSelect, #quiz, #result, #listView { display: none; }
         .active { display: block !important; }
         .stats { font-size: 14px; color: #888; margin: 10px 0; }
@@ -52,15 +46,12 @@
     <div id="setup">
         <h1>英単語1800</h1>
         <div class="stats" id="totalStatsText"></div>
-        
         <div class="section-grid">
             <button class="btn-utility" onclick="openListView()">単語一覧を表示</button>
             <button class="btn-utility" onclick="startQuiz('wrong')" style="background:#555; color:white;">苦手克服モード</button>
         </div>
-
         <h3>100問ごとのセクション</h3>
         <div id="sectionButtons" class="section-grid"></div>
-
         <h3>全範囲からランダム</h3>
         <div class="section-grid">
             <button class="btn-main" onclick="startQuiz(10)">10問</button>
@@ -68,20 +59,17 @@
             <button class="btn-main" onclick="startQuiz(50)">50問</button>
             <button class="btn-main" onclick="startQuiz(100)">100問</button>
         </div>
-
         <button class="btn-danger-zone" onclick="resetAllData()">全学習記録をリセット</button>
     </div>
 
     <div id="listView">
         <h2>単語一覧・習得状況</h2>
-        <div style="text-align: right; margin-bottom: 10px;">
-            <button onclick="location.reload()">閉じる</button>
+        <div style="position: sticky; top: 0; background: var(--bg); padding: 10px; z-index: 10;">
+            <button onclick="backToMenu()" style="width: 100%;">メニューに戻る</button>
         </div>
         <div style="max-height: 500px; overflow-y: auto; background: white; border-radius: 10px;">
             <table class="word-list-table">
-                <thead>
-                    <tr><th>ID</th><th>単語 / 意味</th><th>習得</th></tr>
-                </thead>
+                <thead><tr><th>ID</th><th>単語 / 意味</th><th>習得</th></tr></thead>
                 <tbody id="wordListBody"></tbody>
             </table>
         </div>
@@ -91,7 +79,19 @@
         <h2 id="selectedSectionText"></h2>
         <p>未習得を優先して出題します</p>
         <div class="section-grid" id="countOptions"></div>
-        <div style="margin-top:30px;"><a href="#" onclick="location.reload()" style="color:#999; text-decoration:none;">← 戻る</a></div>
+        <div style="margin-top:30px;"><a href="javascript:void(0)" onclick="backToMenu()" style="color:#999; text-decoration:none;">← 戻る</a></div>
     </div>
 
-    <div id="quiz
+    <div id="quiz">
+        <div class="stats">問題: <span id="progressNum">0</span> / <span id="totalNum">0</span></div>
+        <div class="progress-container"><div id="progressBar"></div></div>
+        <div class="card">
+            <div id="wordDisplay" class="word"></div>
+            <div id="meaningDisplay" class="meaning"></div>
+        </div>
+        <button id="showBtn" onclick="showAnswer()">答えを表示</button>
+        <div class="action-container">
+            <button id="correctBtn" class="action-btn" onclick="handleResult(true)">正解！</button>
+            <button id="wrongBtn" class="action-btn" onclick="handleResult(false)">間違い</button>
+        </div>
+        <div style="margin-top:30px;"><a href="javascript
