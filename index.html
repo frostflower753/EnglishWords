@@ -6,33 +6,30 @@
     <title>英単語1800 マスター</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <style>
-        :root { --primary: #1a73e8; --success: #34a853; --danger: #ea4335; --gray: #5f6368; --bg: #f8f9fa; }
+        :root { --primary: #1a73e8; --success: #2e7d32; --danger: #d32f2f; --gray: #5f6368; --bg: #f8f9fa; }
         body { font-family: 'Helvetica Neue', Arial, sans-serif; text-align: center; background: var(--bg); margin: 0; padding: 20px; color: #333; }
         .container { max-width: 600px; margin: 0 auto; }
         
-        /* カードのデザイン */
-        .card { background: white; border-radius: 20px; padding: 40px 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin: 20px auto; min-height: 220px; display: flex; flex-direction: column; justify-content: center; align-items: center; position: relative; }
+        .card { background: white; border-radius: 20px; padding: 40px 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.05); margin: 20px auto; min-height: 220px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
         .word { font-size: 40px; font-weight: bold; color: var(--primary); margin-bottom: 20px; }
         .meaning { font-size: 28px; color: var(--gray); display: none; border-top: 1px solid #eee; padding-top: 15px; width: 100%; }
         
-        /* ボタンのデザイン */
         button { padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 12px; margin: 5px; font-weight: bold; transition: 0.2s; }
         button:active { transform: scale(0.95); }
         .btn-main { background: var(--primary); color: white; width: 70px; }
         .btn-section { background: white; color: var(--primary); border: 1px solid var(--primary); font-size: 14px; flex: 1 1 40%; }
-        .btn-wrong { background: #555; color: white; width: 90%; max-width: 300px; }
+        .btn-wrong-mode { background: #555; color: white; width: 90%; max-width: 300px; }
         
-        /* クイズ操作ボタン */
+        /* クイズ操作ボタンのコンテナ */
         .action-container { display: flex; justify-content: space-between; width: 100%; gap: 10px; }
         .action-btn { flex: 1; padding: 18px; font-size: 18px; color: white; }
+        
+        /* 左：正解、右：間違い の順に修正 */
         #correctBtn { background: var(--success); display: none; }
         #wrongBtn { background: var(--danger); display: none; }
         #showBtn { background: var(--primary); color: white; width: 100%; }
 
-        /* セクションボタンのグリッド */
         .section-grid { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 15px; justify-content: center; }
-        
-        /* プログレスバー */
         .progress-container { width: 100%; background: #ddd; border-radius: 10px; height: 8px; margin: 10px 0; overflow: hidden; }
         #progressBar { width: 0%; height: 100%; background: var(--primary); transition: width 0.3s; }
 
@@ -50,8 +47,7 @@
     <div id="setup">
         <h1>英単語1800</h1>
         <div class="stats" id="totalStatsText"></div>
-        
-        <button class="btn-wrong" onclick="startQuiz('wrong')">苦手克服モード (ミスのみ)</button>
+        <button class="btn-wrong-mode" onclick="startQuiz('wrong')">苦手克服モード (ミスのみ)</button>
 
         <h3>ランダムに出題</h3>
         <div class="section-grid">
@@ -76,9 +72,10 @@
         </div>
 
         <button id="showBtn" onclick="showAnswer()">答えを表示</button>
+        
         <div class="action-container">
-            <button id="wrongBtn" class="action-btn" onclick="handleResult(false)">間違い</button>
             <button id="correctBtn" class="action-btn" onclick="handleResult(true)">正解！</button>
+            <button id="wrongBtn" class="action-btn" onclick="handleResult(false)">間違い</button>
         </div>
         
         <div style="margin-top:30px;">
@@ -93,7 +90,7 @@
             <div id="accuracy" style="font-size: 48px; font-weight: bold; color: var(--success); margin: 10px 0;">0%</div>
             <div id="resultText" style="color: var(--gray);"></div>
         </div>
-        <button class="btn-wrong" style="width:100%" onclick="location.reload()">タイトルに戻る</button>
+        <button class="btn-wrong-mode" style="width:100%" onclick="location.reload()">タイトルに戻る</button>
     </div>
 </div>
 
@@ -119,7 +116,7 @@ window.onload = () => {
             updateStats();
         },
         error: function() {
-            document.getElementById('loading').innerHTML = "<p style='color:red;'>CSVファイルが見つかりません。GitHubにアップするかLive Serverを使用してください。</p>";
+            document.getElementById('loading').innerHTML = "<p style='color:red;'>CSV読み込みエラー</p>";
         }
     });
 };
@@ -180,7 +177,6 @@ function showQuestion() {
     document.getElementById('correctBtn').style.display = 'none';
     document.getElementById('wrongBtn').style.display = 'none';
     
-    // 進捗の更新
     document.getElementById('progressNum').innerText = currentIndex + 1;
     document.getElementById('totalNum').innerText = total;
     document.getElementById('progressBar').style.width = ((currentIndex) / total * 100) + "%";
