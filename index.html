@@ -32,6 +32,7 @@
         .word-list-table th, .word-list-table td { padding: 12px; border-bottom: 1px solid #eee; }
         .mastery-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #ddd; margin-right: 4px; }
         .dot-filled { background: var(--gold); }
+        /* 初期状態でloading以外を消す */
         #setup, #countSelect, #quiz, #result, #listView { display: none; }
         .active { display: block !important; }
         .stats { font-size: 14px; color: #888; margin: 10px 0; }
@@ -41,7 +42,10 @@
 <body>
 
 <div class="container">
-    <div id="loading">ファイルを読み込み中...</div>
+    <div id="loading">
+        <p>ファイルを読み込み中...</p>
+        <p style="font-size: 12px; color: #999;">※数秒待っても進まない場合は、ファイル名が正しいか確認してください。</p>
+    </div>
 
     <div id="setup">
         <h1>英単語1800</h1>
@@ -63,7 +67,7 @@
     </div>
 
     <div id="listView">
-        <h2>単語一覧・習得状況</h2>
+        <h2>単語一覧</h2>
         <div style="position: sticky; top: 0; background: var(--bg); padding: 10px; z-index: 10;">
             <button onclick="backToMenu()" style="width: 100%;">メニューに戻る</button>
         </div>
@@ -94,4 +98,221 @@
             <button id="correctBtn" class="action-btn" onclick="handleResult(true)">正解！</button>
             <button id="wrongBtn" class="action-btn" onclick="handleResult(false)">間違い</button>
         </div>
-        <div style="margin-top:30px;"><a href="javascript
+        <div style="margin-top:30px;"><a href="javascript:void(0)" onclick="confirmBack()" style="color:#999; text-decoration:none; font-size: 14px;">← 中断して戻る</a></div>
+    </div>
+
+    <div id="result">
+        <h1>学習完了！</h1>
+        <div class="card">
+            <div id="accuracy" style="font-size: 48px; font-weight: bold; color: var(--success);">0%</div>
+            <div id="resultText"></div>
+        </div>
+        <button style="background:#555; color:white; width:100%" onclick="backToMenu()">タイトルに戻る</button>
+    </div>
+</div>
+
+<script>
+let wordData = [];
+let tempSectionWords = [];
+let quizWords = [];
+let currentIndex = 0;
+let correctCount = 0;
+const STORAGE_KEY = 'v2_word_mastery'; // キーを少し変えてリフレッシュ
+const CSV_FILE = '英単語1800 - シート1.csv';
+
+window.onload = () => {
+    // CSVの読み込みを開始
+    Papa.parse(CSV_FILE, {
+        download: true,
+        header: false,
+        complete: function(results) {
+            console.log("CSV loaded successfully");
+            wordData = results.data
+                .map(row => ({ id: String(row[0]).trim(), w: row[1], m: row[2] }))
+                .filter(item => item.w && item.id && !isNaN(item.id));
+            
+            if(wordData.length === 0) {
+                document.getElementById('loading').innerHTML = "<p style='color:red;'>CSVの中身が空、または形式が正しくありません。</p>";
+                return;
+            }
+            
+            // 読み込み完了したらメニューを表示
+            document.getElementById('loading').style.display = 'none';
+            backToMenu();
+        },
+        error: function(err) {
+            console.error(err);
+            document.getElementById('loading').innerHTML = `
+                <p style='color:red;'>ファイルの読み込みに失敗しました。</p>
+                <p style='font-size:12px;'>理由: ${err.message || 'ファイルが見つからないか、ブラウザの制限です。'}</p>
+                <p style='font-size:12px;'>解決策: GitHub Pagesにアップロードするか、VSCodeのLive Serverを使用して開いてください。</p>
+            `;
+        }
+    });
+};
+
+function backToMenu() {
+    // 全画面を非表示
+    const screens = ['setup', 'countSelect', 'quiz', 'result', 'listView'];
+    screens.forEach(s => document.getElementById(s).classList.remove('active'));
+    
+    // セットアップ画面を表示
+    document.getElementById('setup').classList.add('active');
+    
+    // 統計とボタンを更新
+    updateStats();
+    const container = document.getElementById('sectionButtons');
+    container.innerHTML = '';
+    createSectionButtons();
+}
+
+function getMasteryData() {
+    return JSON.parse(localStorage.getItem(STORAGE_KEY) || "{}");
+}
+
+function updateStats() {
+    const mastery = getMasteryData();
+    const masteredCount = Object.values(mastery).filter(count => count >= 2).length;
+    document.getElementById('totalStatsText').innerText = `全${wordData.length}語中、習得済み: ${masteredCount}語`;
+}
+
+function createSectionButtons() {
+    const container = document.getElementById('sectionButtons');
+    const mastery = getMasteryData();
+    for (let i = 0; i < wordData.length; i += 100) {
+        const start = i + 1;
+        const end = Math.min(i + 100, wordData.length);
+        const sectionWords = wordData.slice(i, end);
+        const isMastered = sectionWords.every(w => (mastery[w.id] || 0) >= 2);
+        
+        const btn = document.createElement('button');
+        btn.className = `btn-section ${isMastered ? 'btn-mastered' : ''}`;
+        btn.innerHTML = `${isMastered ? '<span class="mastered-badge">★習得済み★</span>' : ''}${start} 〜 ${end}`;
+        btn.onclick = () => openCountSelect(start, end);
+        container.appendChild(btn);
+    }
+}
+
+function openListView() {
+    const mastery = getMasteryData();
+    const tbody = document.getElementById('wordListBody');
+    tbody.innerHTML = '';
+    wordData.forEach(w => {
+        const count = mastery[w.id] || 0;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${w.id}</td><td><strong>${w.w}</strong><br><small>${w.m}</small></td><td><span class="mastery-dot ${count >= 1 ? 'dot-filled' : ''}"></span><span class="mastery-dot ${count >= 2 ? 'dot-filled' : ''}"></span></td>`;
+        tbody.appendChild(tr);
+    });
+    document.getElementById('setup').classList.remove('active');
+    document.getElementById('listView').classList.add('active');
+}
+
+function resetAllData() {
+    if (confirm("学習記録をすべてリセットしますか？")) {
+        localStorage.removeItem(STORAGE_KEY);
+        backToMenu();
+    }
+}
+
+function confirmBack() {
+    if(confirm('中断して戻りますか？')) backToMenu();
+}
+
+function openCountSelect(start, end) {
+    document.getElementById('setup').classList.remove('active');
+    document.getElementById('countSelect').classList.add('active');
+    document.getElementById('selectedSectionText').innerText = `範囲: ${start} 〜 ${end}`;
+    tempSectionWords = wordData.filter(w => {
+        const idNum = parseInt(w.id);
+        return idNum >= start && idNum <= end;
+    });
+    const opts = [10, 20, 40, 50, 75, 100];
+    const container = document.getElementById('countOptions');
+    container.innerHTML = '';
+    opts.forEach(num => {
+        const b = document.createElement('button');
+        b.className = 'btn-main';
+        b.style.width = '100px';
+        b.innerText = `${num}問`;
+        b.onclick = () => setCountAndStart(num);
+        container.appendChild(b);
+    });
+}
+
+function setCountAndStart(count) {
+    const mastery = getMasteryData();
+    const unmastered = tempSectionWords.filter(w => (mastery[w.id] || 0) < 2).sort(() => 0.5 - Math.random());
+    const mastered = tempSectionWords.filter(w => (mastery[w.id] || 0) >= 2).sort(() => 0.5 - Math.random());
+    let selected = [...unmastered, ...mastered].slice(0, count);
+    quizWords = selected.sort(() => 0.5 - Math.random());
+    startQuizCore();
+}
+
+function startQuiz(mode) {
+    const mastery = getMasteryData();
+    if (mode === 'wrong') {
+        quizWords = wordData.filter(w => (mastery[w.id] || 0) === 0);
+        if (quizWords.length === 0) return alert("記録のあるミスはありません！");
+    } else {
+        quizWords = [...wordData];
+    }
+    quizWords = quizWords.sort(() => 0.5 - Math.random()).slice(0, typeof mode === 'number' ? mode : quizWords.length);
+    startQuizCore();
+}
+
+function startQuizCore() {
+    correctCount = 0; currentIndex = 0;
+    const screens = ['setup', 'countSelect', 'quiz', 'result', 'listView'];
+    screens.forEach(s => document.getElementById(s).classList.remove('active'));
+    document.getElementById('quiz').classList.add('active');
+    showQuestion();
+}
+
+function showQuestion() {
+    const current = quizWords[currentIndex];
+    document.getElementById('wordDisplay').innerText = current.w;
+    document.getElementById('meaningDisplay').innerText = current.m;
+    document.getElementById('meaningDisplay').style.display = 'none';
+    document.getElementById('showBtn').style.display = 'block';
+    document.getElementById('correctBtn').style.display = 'none';
+    document.getElementById('wrongBtn').style.display = 'none';
+    document.getElementById('progressNum').innerText = currentIndex + 1;
+    document.getElementById('totalNum').innerText = quizWords.length;
+    document.getElementById('progressBar').style.width = (currentIndex / quizWords.length * 100) + "%";
+}
+
+function showAnswer() {
+    document.getElementById('meaningDisplay').style.display = 'block';
+    document.getElementById('showBtn').style.display = 'none';
+    document.getElementById('correctBtn').style.display = 'block';
+    document.getElementById('wrongBtn').style.display = 'block';
+}
+
+function handleResult(isCorrect) {
+    const current = quizWords[currentIndex];
+    let mastery = getMasteryData();
+    if (isCorrect) {
+        correctCount++;
+        mastery[current.id] = (mastery[current.id] || 0) + 1;
+    } else {
+        mastery[current.id] = 0;
+    }
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(mastery));
+    currentIndex++;
+    if (currentIndex < quizWords.length) {
+        showQuestion();
+    } else {
+        showFinalResult();
+    }
+}
+
+function showFinalResult() {
+    document.getElementById('quiz').classList.remove('active');
+    document.getElementById('result').classList.add('active');
+    const percent = Math.round((correctCount / quizWords.length) * 100);
+    document.getElementById('accuracy').innerText = percent + "%";
+    document.getElementById('resultText').innerText = `${quizWords.length}問中 ${correctCount}問正解！`;
+}
+</script>
+</body>
+</html>
